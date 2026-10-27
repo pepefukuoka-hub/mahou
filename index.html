@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#120a24">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="魔法">
+<title>魔法</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+<main id="start" class="screen">
+  <h1>魔法</h1>
+  <p class="lead">カメラに映った景色に、声で魔法をかけます。呪文を言うと、目の前に、魔法が出ます。</p>
+  <ul class="words">
+    <li>⚡ <b>サンダー</b>(雷・かみなり)</li>
+    <li>🔥 <b>ファイヤー</b>(火・炎)</li>
+    <li>💧 <b>ウォーター</b>(水)</li>
+    <li>🍙 <b>おにぎり</b>(おむすび)</li>
+    <li>❄️ <b>アイス</b>(氷・雪)</li>
+    <li>🎆 <b>花火</b>(はなび)</li>
+    <li>💖 <b>ハート</b>(ラブ)</li>
+    <li>⭐ <b>スター</b>(星・流れ星)</li>
+  </ul>
+  <button type="button" class="primary" id="go">はじめる</button>
+  <p class="msg" id="step" role="status"></p>
+  <p class="err" id="err" role="alert"></p>
+  <p class="msg">カメラとマイクと、スマホの向きの許可が要ります。映像は、外に送りません。声は、スマホ会社(iPhoneはApple、AndroidはGoogle)の聞き取りの仕組みに送られます。電波のある所で使ってください。</p>
+  <p class="msg" id="ver">版 1</p>
+</main>
+
+<div id="stage" hidden>
+  <video id="cam" playsinline muted autoplay></video>
+  <canvas id="gl"></canvas>
+  <div id="flash"></div>
+  <div id="hud">
+    <div id="heard"><span id="mic">🎤</span> <span id="said">呪文を言ってください</span></div>
+    <div id="diag"></div>
+  </div>
+  <div id="bar"></div>
+</div>
+
+<script src="vendor/aframe.min.js"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
