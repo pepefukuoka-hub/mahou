@@ -1,15 +1,15 @@
 (() => {
   'use strict';
-  const VER = 1;
+  const VER = 2;
   const $ = (id) => document.getElementById(id);
   const GROUND = -1.4;   // 目の高さ 1.4 m と見なした、地面の高さ
 
   // ---------- 呪文(ことば) ----------
   const SPELLS = {
-    thunder: { icon: '⚡', label: 'サンダー', words: ['サンダー', '雷', 'カミナリ', 'ライトニング', 'イナズマ', '稲妻', 'thunder', 'lightning'] },
-    fire: { icon: '🔥', label: 'ファイヤー', words: ['ファイヤー', 'ファイアー', 'ファイア', 'ファイヤ', '火', '炎', 'ホノオ', 'fire'] },
-    water: { icon: '💧', label: 'ウォーター', words: ['ウォーター', 'ウォータ', 'ウオーター', '水', 'ミズ', 'アクア', 'water'] },
-    onigiri: { icon: '🍙', label: 'おにぎり', words: ['オニギリ', 'お握り', 'オムスビ', 'お結び', 'おむすび', 'onigiri'] },
+    thunder: { icon: '⚡', label: 'サンダー', words: ['サンダー', 'サンダ', 'サンダァ', '雷', 'カミナリ', 'ライトニング', 'イナズマ', '稲妻', 'thunder', 'lightning'] },
+    fire: { icon: '🔥', label: 'ファイヤー', words: ['ファイヤー', 'ファイアー', 'ファイア', 'ファイヤ', 'ファイ', 'ファイヤーー', '火', '炎', 'ホノオ', 'fire'] },
+    water: { icon: '💧', label: 'ウォーター', words: ['ウォーター', 'ウォータ', 'ウオーター', 'ウォター', 'ワーター', 'ウォーラー', '水', 'ミズ', 'アクア', 'water'] },
+    onigiri: { icon: '🍙', label: 'にぎにぎ', words: ['ニギニギ', '握握', '握り握り', 'ニギ二ギ', 'nigi nigi', 'niginigi'] },
     ice: { icon: '❄️', label: 'アイス', words: ['アイス', '氷', 'コオリ', '雪', 'ユキ', 'ブリザード', 'ice', 'snow'] },
     hanabi: { icon: '🎆', label: '花火', words: ['花火', 'ハナビ', 'ファイヤーワークス', 'ファイアーワークス', 'fireworks'] },
     heart: { icon: '💖', label: 'ハート', words: ['ハート', 'ラブ', '愛', 'heart', 'love'] },
@@ -302,6 +302,29 @@
   let castLog = [];
   function log(s) { castLog.push(s); castLog = castLog.slice(-3); }
 
+  // ---------- マイクの音の大きさ(メーター) ----------
+  let mAn = null, mBuf = null, mStream = null, mLvl = 0, mPeak = 0;
+  const flag = (id, text, cls, ms) => { const e = $(id); e.textContent = text; e.className = cls || ''; if (ms) setTimeout(() => { if (e.textContent === text) { e.className = ''; } }, ms); };
+  async function startMeter() {
+    try {
+      mStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }, video: false });
+      const src = ac.createMediaStreamSource(mStream);
+      mAn = ac.createAnalyser(); mAn.fftSize = 512; mBuf = new Float32Array(mAn.fftSize); src.connect(mAn);
+      flag('cMic', 'マイク ○', 'on');
+    } catch (e) { mAn = null; flag('cMic', 'マイク ×(' + (e.name || e) + ')', 'bad'); }
+  }
+  function stopMeter() { if (mStream) mStream.getTracks().forEach((t) => t.stop()); mStream = null; mAn = null; $('mfill').style.width = '0'; flag('cMic', 'マイク -', ''); }
+  function meterTick() {
+    if (!mAn) return;
+    mAn.getFloatTimeDomainData(mBuf);
+    let s = 0; for (let i = 0; i < mBuf.length; i++) s += mBuf[i] * mBuf[i];
+    const lv = Math.min(1, Math.sqrt(Math.sqrt(s / mBuf.length)) * 1.6);   // 小さい声でも動くように
+    mLvl = lv > mLvl ? lv : mLvl * 0.85; mPeak = Math.max(mPeak * 0.97, lv);
+    $('mfill').style.width = (mLvl * 100).toFixed(0) + '%';
+    if (lv > 0.35) flag('cSound', '音 ○', 'on', 600);
+  }
+  let resN = 0;
+
   // ---------- 声 ----------
   let rec = null, wantRec = false, seen = {}, saidTimer = 0, micState = '';
   function setMic(icon, text) { $('mic').textContent = icon; if (text) setSaid(text, true); }
@@ -310,7 +333,7 @@
   function heard(results, from) {
     for (let i = from; i < results.length; i++) {
       const text = results[i][0].transcript, c = countSpells(text), prev = seen[i] || {};
-      if (i === results.length - 1) setSaid(text);
+      if (i === results.length - 1) { setSaid(text); resN++; $('cRes').textContent = '認識 ' + resN; $('cRes').className = 'on'; $('raw').textContent = '聞こえた文字: ' + text + (Object.keys(c).length ? '  → ' + Object.keys(c).map((k) => SPELLS[k].label).join('・') : '  → 呪文なし'); }
       for (const k in c) { const add = c[k] - (prev[k] || 0); for (let j = 0; j < add; j++) cast(k, '声'); }
       seen[i] = c;
     }
@@ -322,7 +345,10 @@
     const begin = () => {
       if (!wantRec) return;
       rec = new SR(); rec.lang = 'ja-JP'; rec.continuous = true; rec.interimResults = true; rec.maxAlternatives = 1; seen = {};
-      rec.onstart = () => setMic('🎤');
+      rec.onstart = () => { setMic('🎤'); flag('cRes', '認識 ' + resN + '(待機中)', ''); };
+      rec.onsoundstart = () => flag('cSound', '音 ○', 'on', 1500);
+      rec.onspeechstart = () => flag('cVoice', '声 ○', 'on', 1500);
+      rec.onspeechend = () => flag('cVoice', '声 -', '');
       rec.onresult = (e) => { try { heard(e.results, e.resultIndex); } catch (x) {} };
       rec.onerror = (e) => {
         if (e.error === 'no-speech' || e.error === 'aborted') return;
@@ -342,7 +368,7 @@
     requestAnimationFrame(loop);
     try {
       const dt = Math.min(0.05, (t - lastT) / 1000 || 0.016); lastT = t;
-      look(); updateEmitters(dt); updateParts(dt); renderer.render(scene, camera);
+      meterTick(); look(); updateEmitters(dt); updateParts(dt); renderer.render(scene, camera);
       if (Math.floor(t / 500) !== loop.k) { loop.k = Math.floor(t / 500); $('diag').textContent = '粒 ' + parts.length + (ori.n ? ' 向き○' : ' 向き×') + (castLog.length ? '\n' + castLog.join(' / ') : '') + '\n版 ' + VER; }
     } catch (e) { $('diag').textContent = 'エラー: ' + (e && e.message); }
   }
@@ -380,7 +406,8 @@
       window.addEventListener('resize', () => {});
       requestAnimationFrame(loop);
       try { navigator.wakeLock && navigator.wakeLock.request('screen').catch(() => {}); } catch (e) {}
-      setTimeout(() => startRec(), 300);   // 声の許可は、画面が出てから
+      startMeter().then(() => setTimeout(() => startRec(), 400));   // マイクの許可は、画面が出てから
+      $('meter').addEventListener('click', () => { if (mAn) stopMeter(); else startMeter(); });
     } catch (e) {
       err.textContent = '始められませんでした: ' + (e && e.name ? e.name + ' ' : '') + (e && e.message || e);
       $('go').disabled = false;
@@ -389,6 +416,6 @@
   $('go').addEventListener('click', start);
   $('ver').textContent = '版 ' + VER;
   document.addEventListener('visibilitychange', () => { if (!document.hidden && wantRec && rec) { try { rec.start(); } catch (e) {} } });
-  window.__mahou = { cast, countSpells, heard: (t) => heard([[{ transcript: t }]], 0) };
+  window.__mahou = { cast, countSpells, meter: () => ({ on: !!mAn, lvl: mLvl, peak: mPeak }), heard: (t) => heard([[{ transcript: t }]], 0) };
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
