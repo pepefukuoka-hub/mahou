@@ -10,12 +10,12 @@
 <title>魔法</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 <main id="start" class="screen">
   <h1>魔法</h1>
-  <p class="lead">カメラに映った景色に、声で魔法をかけます。呪文を言うと、目の前に、魔法が出ます。</p>
+  <p class="lead">カメラに映った景色に、声で魔法をかけます。呪文を言うと、目の前に、魔法が出ます。右下の「必殺の本」をめくると、呪文が1ページに1つ、書いてあります。</p>
   <ul class="words">
     <li>⚡ <b>サンダー</b>(雷・かみなり)</li>
     <li>🔥 <b>ファイヤー</b>(火・炎)</li>
@@ -30,7 +30,7 @@
   <p class="msg" id="step" role="status"></p>
   <p class="err" id="err" role="alert"></p>
   <p class="msg">カメラとマイクと、スマホの向きの許可が要ります。映像は、外に送りません。声は、スマホ会社(iPhoneはApple、AndroidはGoogle)の聞き取りの仕組みに送られます。電波のある所で使ってください。</p>
-  <p class="msg" id="ver">版 2</p>
+  <p class="msg" id="ver">版 3</p>
 </main>
 
 <div id="stage" hidden>
@@ -44,10 +44,27 @@
     <div id="raw"></div>
     <div id="diag"></div>
   </div>
-  <div id="bar"></div>
+  <button type="button" id="bookBtn" aria-label="必殺の本を開く"><span>📖</span><small>必殺の本</small></button>
+  <section id="book" hidden aria-label="必殺の本">
+    <div class="cover">
+      <div class="page" id="page">
+        <div class="pno" id="pno"></div>
+        <div class="pic" id="pic"></div>
+        <div class="pname" id="pname"></div>
+        <div class="psay" id="psay"></div>
+        <div class="pdesc" id="pdesc"></div>
+        <button type="button" class="cast" id="pcast">この魔法を出す</button>
+      </div>
+      <div class="nav">
+        <button type="button" id="pprev" aria-label="前のページ">◀</button>
+        <button type="button" id="pclose">とじる</button>
+        <button type="button" id="pnext" aria-label="次のページ">▶</button>
+      </div>
+    </div>
+  </section>
 </div>
 
 <script src="vendor/aframe.min.js"></script>
-<script src="app.js?v=2"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>

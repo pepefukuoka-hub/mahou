@@ -1,19 +1,19 @@
 (() => {
   'use strict';
-  const VER = 2;
+  const VER = 3;
   const $ = (id) => document.getElementById(id);
   const GROUND = -1.4;   // 目の高さ 1.4 m と見なした、地面の高さ
 
   // ---------- 呪文(ことば) ----------
   const SPELLS = {
-    thunder: { icon: '⚡', label: 'サンダー', words: ['サンダー', 'サンダ', 'サンダァ', '雷', 'カミナリ', 'ライトニング', 'イナズマ', '稲妻', 'thunder', 'lightning'] },
-    fire: { icon: '🔥', label: 'ファイヤー', words: ['ファイヤー', 'ファイアー', 'ファイア', 'ファイヤ', 'ファイ', 'ファイヤーー', '火', '炎', 'ホノオ', 'fire'] },
-    water: { icon: '💧', label: 'ウォーター', words: ['ウォーター', 'ウォータ', 'ウオーター', 'ウォター', 'ワーター', 'ウォーラー', '水', 'ミズ', 'アクア', 'water'] },
-    onigiri: { icon: '🍙', label: 'にぎにぎ', words: ['ニギニギ', '握握', '握り握り', 'ニギ二ギ', 'nigi nigi', 'niginigi'] },
-    ice: { icon: '❄️', label: 'アイス', words: ['アイス', '氷', 'コオリ', '雪', 'ユキ', 'ブリザード', 'ice', 'snow'] },
-    hanabi: { icon: '🎆', label: '花火', words: ['花火', 'ハナビ', 'ファイヤーワークス', 'ファイアーワークス', 'fireworks'] },
-    heart: { icon: '💖', label: 'ハート', words: ['ハート', 'ラブ', '愛', 'heart', 'love'] },
-    star: { icon: '⭐', label: 'スター', words: ['スター', '流れ星', 'ナガレボシ', '星', 'ホシ', 'star'] },
+    thunder: { icon: '⚡', label: 'サンダー', desc: '空から、いなずまが落ちる。ピカッと光って、ゴロゴロ鳴る。', words: ['サンダー', 'サンダ', 'サンダァ', '雷', 'カミナリ', 'ライトニング', 'イナズマ', '稲妻', 'thunder', 'lightning'] },
+    fire: { icon: '🔥', label: 'ファイヤー', desc: '足もとから、炎がいっぱいに広がる。', words: ['ファイヤー', 'ファイアー', 'ファイア', 'ファイヤ', 'ファイ', 'ファイヤーー', '火', '炎', 'ホノオ', 'fire'] },
+    water: { icon: '💧', label: 'ウォーター', desc: 'あちこちから、水がふき出す。', words: ['ウォーター', 'ウォータ', 'ウオーター', 'ウォター', 'ワーター', 'ウォーラー', '水', 'ミズ', 'アクア', 'water'] },
+    onigiri: { icon: '🍙', label: 'にぎにぎ', desc: 'おにぎりが、たくさん飛んでいく。', words: ['ニギニギ', '握握', '握り握り', 'ニギ二ギ', 'nigi nigi', 'niginigi'] },
+    ice: { icon: '❄️', label: 'アイス', desc: '雪の結晶が、まわりにふりそそぐ。', words: ['アイス', '氷', 'コオリ', '雪', 'ユキ', 'ブリザード', 'ice', 'snow'] },
+    hanabi: { icon: '🎆', label: '花火', desc: '夜空に、大きな花火が3発。', words: ['花火', 'ハナビ', 'ファイヤーワークス', 'ファイアーワークス', 'fireworks'] },
+    heart: { icon: '💖', label: 'ハート', desc: 'ハートが、ふわふわ空にのぼる。', words: ['ハート', 'ラブ', '愛', 'heart', 'love'] },
+    star: { icon: '⭐', label: 'スター', desc: '流れ星が、ツーッと流れる。', words: ['スター', '流れ星', 'ナガレボシ', '星', 'ホシ', 'star'] },
   };
   const WORD_LIST = [];
   Object.keys(SPELLS).forEach((k) => SPELLS[k].words.forEach((w) => WORD_LIST.push([toKata(w).toLowerCase(), k])));
@@ -298,6 +298,7 @@
     if (ac && ac.state === 'suspended') ac.resume();
     try { MAGIC[name](); } catch (e) { $('diag').textContent = '魔法のエラー: ' + (e && e.message); }
     log('cast ' + name + (source ? ' (' + source + ')' : ''));
+    if (!$('book').hidden && source === '声') turn(KEYS.indexOf(name));
   }
   let castLog = [];
   function log(s) { castLog.push(s); castLog = castLog.slice(-3); }
@@ -373,14 +374,38 @@
     } catch (e) { $('diag').textContent = 'エラー: ' + (e && e.message); }
   }
 
-  function buildBar() {
-    const bar = $('bar');
-    Object.keys(SPELLS).forEach((k) => {
-      const b = document.createElement('button'); b.type = 'button';
-      b.innerHTML = '<span>' + SPELLS[k].icon + '</span>' + SPELLS[k].label;
-      b.addEventListener('click', () => cast(k, 'ボタン'));
-      bar.appendChild(b);
-    });
+  // ---------- 必殺の本(1ページに1つの呪文) ----------
+  const KEYS = Object.keys(SPELLS); let pg = 0, flipping = false;
+  function fillPage() {
+    const k = KEYS[pg], sp = SPELLS[k];
+    $('pno').textContent = (pg + 1) + ' / ' + KEYS.length;
+    $('pic').textContent = sp.icon; $('pname').textContent = sp.label;
+    const alias = k === 'onigiri' ? [] : sp.words.filter((w) => /[\u4e00-\u9fff]/.test(w) && w !== sp.label).slice(0, 3);
+    $('psay').textContent = '「' + sp.label + '」と言ってね' + (alias.length ? '\n(' + alias.join('・') + ' でも出ます)' : '');
+    $('psay').style.whiteSpace = 'pre-line'; $('pdesc').textContent = sp.desc;
+  }
+  function turn(to, dir) {
+    to = (to + KEYS.length) % KEYS.length;
+    if (flipping || to === pg) return;
+    flipping = true; const el = $('page');
+    el.classList.add('out');
+    setTimeout(() => {
+      pg = to; fillPage(); el.classList.remove('out'); el.classList.add('in');
+      requestAnimationFrame(() => requestAnimationFrame(() => { el.classList.remove('in'); flipping = false; }));
+    }, 170);
+  }
+  function openBook(on) { $('book').hidden = !on; }
+  function buildBook() {
+    fillPage();
+    $('bookBtn').addEventListener('click', () => openBook($('book').hidden));
+    $('pclose').addEventListener('click', () => openBook(false));
+    $('pprev').addEventListener('click', () => turn(pg - 1));
+    $('pnext').addEventListener('click', () => turn(pg + 1));
+    $('pcast').addEventListener('click', () => cast(KEYS[pg], 'ほん'));
+    let sx = null;   // 左右になぞって、めくる
+    const pe = $('page');
+    pe.addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; }, { passive: true });
+    pe.addEventListener('touchend', (e) => { if (sx == null) return; const dx = e.changedTouches[0].clientX - sx; sx = null; if (Math.abs(dx) > 40) turn(pg + (dx < 0 ? 1 : -1)); });
   }
 
   async function start() {
@@ -400,7 +425,7 @@
         $('cam').srcObject = stream; await $('cam').play().catch(() => {});
       } catch (e) { err.textContent = 'カメラが使えません(' + (e.name || e) + ')。カメラなしで続けます。'; }
       step.textContent = '3/3 画面の準備';
-      initGL(); initTex(); initLook(); buildBar();
+      initGL(); initTex(); initLook(); buildBook();
       $('start').hidden = true; $('stage').hidden = false;
       if (!T) throw new Error('three.js が読み込めませんでした');
       window.addEventListener('resize', () => {});
