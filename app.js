@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const VER = 5;
+  const VER = 6;
   const $ = (id) => document.getElementById(id);
   const GROUND = -1.4;   // 目の高さ 1.4 m と見なした、地面の高さ
 
@@ -285,12 +285,18 @@
       nb = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate); const d = nb.getChannelData(0);
       for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
       const comp = ac.createDynamicsCompressor(); comp.connect(ac.destination);
-      bus = ac.createGain(); bus.gain.value = 0.9; bus.connect(comp);
+      bus = ac.createGain(); bus.gain.value = 1.5; bus.connect(comp);
+      ac.onstatechange = () => { showAudio(); };
       const conv = ac.createConvolver(), n = Math.floor(ac.sampleRate * 2.2), ir = ac.createBuffer(2, n, ac.sampleRate);   // ひびき(エコー)
       for (let c = 0; c < 2; c++) { const x = ir.getChannelData(c); for (let i = 0; i < n; i++) x[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2.5); }
       conv.buffer = ir; const wet = ac.createGain(); wet.gain.value = 0.3; bus.connect(wet); wet.connect(conv); conv.connect(comp);
       if (navigator.audioSession) navigator.audioSession.type = 'play-and-record';
     } catch (e) { ac = null; }
+  }
+  function showAudio() { const e = $('cAudio'); if (!e) return; const ok = ac && ac.state === 'running'; e.textContent = '音の出口 ' + (ac ? (ok ? '○' : '× ' + ac.state) : '×'); e.className = ok ? 'on' : 'bad'; }
+  function ensureAudio() {   // iPhoneは、マイクを使ったり画面を切り替えると、音が止まる。そのつど、つけ直す
+    if (ac && ac.state !== 'running') ac.resume().catch(() => {});
+    showAudio();
   }
   function env(g, t0, a, d, peak) { g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(peak, t0 + a); g.gain.exponentialRampToValueAtTime(0.0001, t0 + a + d); }
   function noise(delay, dur, type, freq, peak, q) {
@@ -299,6 +305,17 @@
     const f = ac.createBiquadFilter(); f.type = type; f.frequency.value = freq; if (q) f.Q.value = q;
     const g = ac.createGain(); env(g, t0, Math.min(0.03, dur / 3), dur, peak);
     s.connect(f); f.connect(g); g.connect(bus); s.start(t0, Math.random()); s.stop(t0 + dur + 0.1);
+  }
+  function noiseSweep(delay, dur, type, f0, f1, peak, q) {   // 周波数が動く雑音(ぐちゃっ、ヒュッ)
+    if (!ac) return; const t0 = ac.currentTime + delay;
+    const s = ac.createBufferSource(); s.buffer = nb; s.loop = true;
+    const f = ac.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(f0, t0); f.frequency.exponentialRampToValueAtTime(f1, t0 + dur); if (q) f.Q.value = q;
+    const g = ac.createGain(); env(g, t0, Math.min(0.02, dur / 3), dur, peak);
+    s.connect(f); f.connect(g); g.connect(bus); s.start(t0, Math.random()); s.stop(t0 + dur + 0.1);
+  }
+  function squelch(delay, p, vol) {   // ぐちゃっ
+    noiseSweep(delay, 0.13, 'bandpass', p * 3.2, p * 0.9, vol * 1.3, 5);
+    tone(delay, p, p * 0.4, 0.12, vol * 0.8, 'sine'); tone(delay + 0.025, p * 1.7, p * 0.6, 0.08, vol * 0.35, 'sawtooth');
   }
   function tone(delay, f0, f1, dur, peak, type) {
     if (!ac) return; const t0 = ac.currentTime + delay;
@@ -320,13 +337,17 @@
   }
   const SND = {
     thunder() {
-      noise(0, 0.2, 'highpass', 1800, 1.0); noise(0, 0.6, 'bandpass', 900, 0.9, 0.7);   // バリッ
+      noise(0, 0.2, 'highpass', 1800, 1.0); noise(0, 0.6, 'bandpass', 900, 0.9, 0.7); noiseSweep(0, 0.25, 'highpass', 6000, 800, 1.0);   // バリッ
+      for (let i = 0; i < 14; i++) noise(R(0.02, 0.5), 0.03, 'highpass', R(2500, 6000), R(0.4, 0.9));   // バチバチ
       noise(0.03, 3.4, 'lowpass', 260, 1.0); tone(0.03, 62, 26, 2.6, 0.9); noise(0.8, 2.8, 'lowpass', 150, 0.7);   // ゴロゴロ
       noise(0.18, 0.15, 'highpass', 2200, 0.7); noise(0.34, 0.12, 'highpass', 2200, 0.55); tone(0.18, 80, 30, 1.4, 0.5);
     },
-    fire() { noise(0, 1.0, 'bandpass', 700, 0.9, 0.6); for (let i = 0; i < 26; i++) noise(R(0, 3.6), 0.04, 'bandpass', R(900, 2800), 0.5, 2); noise(0, 4.2, 'lowpass', 420, 0.35); tone(0, 90, 50, 0.7, 0.5); },
-    water() { noise(0, 3.8, 'bandpass', 1400, 0.3, 0.7); noise(0, 3.8, 'highpass', 4000, 0.1); for (let i = 0; i < 14; i++) tone(R(0, 3.4), R(500, 900), R(1200, 1800), 0.08, 0.15); },
-    onigiri() { for (let i = 0; i < 10; i++) tone(i * 0.09, R(500, 700), R(900, 1300), 0.1, 0.3, 'triangle'); },
+    fire() { noiseSweep(0, 0.9, 'bandpass', 200, 1800, 1.0, 0.8); noise(0, 4.2, 'lowpass', 300, 0.7); tone(0, 60, 40, 1.2, 0.9); noise(0, 1.0, 'bandpass', 700, 0.9, 0.6); for (let i = 0; i < 26; i++) noise(R(0, 3.6), 0.04, 'bandpass', R(900, 2800), 0.5, 2); noise(0, 4.2, 'lowpass', 420, 0.35); tone(0, 90, 50, 0.7, 0.5); },
+    water() { noiseSweep(0, 0.5, 'lowpass', 300, 3000, 1.0); noise(0.05, 0.6, 'bandpass', 2200, 0.7, 0.8); for (let i = 0; i < 8; i++) tone(R(0.1, 2.5), R(300, 500), R(800, 1500), 0.12, 0.3); noise(0, 3.8, 'bandpass', 1400, 0.45, 0.7); noise(0, 3.8, 'highpass', 4000, 0.1); for (let i = 0; i < 14; i++) tone(R(0, 3.4), R(500, 900), R(1200, 1800), 0.08, 0.15); },
+    onigiri() {   // ぐちゃぐちゃぐちゃぐちゃ(おにぎりを、にぎる音)
+      for (let i = 0; i < 22; i++) squelch(i * 0.068 + R(0, 0.03), R(170, 420), R(0.5, 0.9));
+      noise(0, 1.6, 'lowpass', 400, 0.35); for (let i = 0; i < 6; i++) tone(0.9 + i * 0.1, R(500, 700), R(900, 1300), 0.1, 0.3, 'triangle');   // 最後に、ぽこぽこ
+    },
     ice() {
       wind(0, 5.4, 0.55, 450, 1100); wind(0.2, 5, 0.25, 1500, 2600); tone(0, 90, 60, 1.4, 0.35);
       for (let i = 0; i < 16; i++) { const f = R(2200, 4600); tone(R(0, 4.2), f, f * 0.98, 0.6, 0.07); }
@@ -336,7 +357,7 @@
       tone(d, 500, 1800, 0.85, 0.05); noise(d + 0.85, 0.5, 'lowpass', 180, 1.0); tone(d + 0.85, 100, 40, 0.5, 0.7); noise(d + 0.88, 1.4, 'highpass', 4500, 0.3);
       for (let i = 0; i < 14; i++) noise(d + 0.95 + R(0, 1.2), 0.03, 'highpass', 5000, 0.35);
     },
-    heart() { [660, 880, 1320, 1760].forEach((f, i) => tone(i * 0.14, f, f * 1.02, 0.9, 0.22)); tone(0.9, 90, 80, 0.25, 0.4); tone(1.2, 90, 80, 0.25, 0.3); },
+    heart() { [660, 880, 1320, 1760, 2200, 2640].forEach((f, i) => { tone(i * 0.12, f, f * 1.02, 1.0, 0.3); tone(i * 0.12, f * 2, f * 2.02, 0.6, 0.1); }); tone(0.9, 90, 80, 0.25, 0.4); tone(1.2, 90, 80, 0.25, 0.3); },
     star() { for (let i = 0; i < 6; i++) tone(i * 0.22, 2600, 500, 0.9, 0.18, 'triangle'); [0.3, 0.5, 0.7, 1.1, 1.4].forEach((d) => tone(d, R(2000, 3000), 1500, 0.3, 0.12)); },
     kame() {
       rise(0, 140, 2600, 1.65, 0.16, 'sawtooth'); rise(0, 55, 220, 1.65, 0.5); rise(0, 300, 3500, 1.65, 0.16, 'triangle'); wind(0, 1.7, 0.35, 300, 2800);
@@ -567,7 +588,7 @@
     const now = performance.now();
     if (!MAGIC[name] || now - (lastCast[name] || -1e9) < (SPELLS[name].cd || 500)) return;
     lastCast[name] = now;
-    if (ac && ac.state === 'suspended') ac.resume();
+    ensureAudio();
     try { MAGIC[name](); } catch (e) { $('diag').textContent = '魔法のエラー: ' + (e && e.message); }
     log('cast ' + name + (source ? ' (' + source + ')' : ''));
     if (!$('book').hidden && source === '声') turn(KEYS.indexOf(name));
@@ -641,6 +662,7 @@
     requestAnimationFrame(loop);
     try {
       const dt = Math.min(0.05, (t - lastT) / 1000 || 0.016); lastT = t;
+      if (Math.floor(t / 1000) !== loop.s) { loop.s = Math.floor(t / 1000); ensureAudio(); }
       meterTick(); look(); updateEmitters(dt); updateFx(dt); updateParts(dt); applyShake(dt); renderer.render(scene, camera);
       if (Math.floor(t / 500) !== loop.k) { loop.k = Math.floor(t / 500); $('diag').textContent = '粒 ' + parts.length + (ori.n ? ' 向き○' : ' 向き×') + (castLog.length ? '\n' + castLog.join(' / ') : '') + '\n版 ' + VER; }
     } catch (e) { $('diag').textContent = 'エラー: ' + (e && e.message); }
@@ -708,6 +730,7 @@
     }
   }
   $('go').addEventListener('click', start);
+  window.addEventListener('pointerdown', ensureAudio); window.addEventListener('touchend', ensureAudio);
   $('ver').textContent = '版 ' + VER;
   document.addEventListener('visibilitychange', () => { if (!document.hidden && wantRec && rec) { try { rec.start(); } catch (e) {} } });
   if (/debug/.test(location.hash)) document.body.classList.add('debug');
