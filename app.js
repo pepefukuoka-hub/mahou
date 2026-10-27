@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const VER = 3;
+  const VER = 4;
   const $ = (id) => document.getElementById(id);
   const GROUND = -1.4;   // 目の高さ 1.4 m と見なした、地面の高さ
 
@@ -378,11 +378,8 @@
   const KEYS = Object.keys(SPELLS); let pg = 0, flipping = false;
   function fillPage() {
     const k = KEYS[pg], sp = SPELLS[k];
-    $('pno').textContent = (pg + 1) + ' / ' + KEYS.length;
+    $('pno').textContent = (pg + 1) + '/' + KEYS.length;
     $('pic').textContent = sp.icon; $('pname').textContent = sp.label;
-    const alias = k === 'onigiri' ? [] : sp.words.filter((w) => /[\u4e00-\u9fff]/.test(w) && w !== sp.label).slice(0, 3);
-    $('psay').textContent = '「' + sp.label + '」と言ってね' + (alias.length ? '\n(' + alias.join('・') + ' でも出ます)' : '');
-    $('psay').style.whiteSpace = 'pre-line'; $('pdesc').textContent = sp.desc;
   }
   function turn(to, dir) {
     to = (to + KEYS.length) % KEYS.length;
@@ -441,6 +438,7 @@
   $('go').addEventListener('click', start);
   $('ver').textContent = '版 ' + VER;
   document.addEventListener('visibilitychange', () => { if (!document.hidden && wantRec && rec) { try { rec.start(); } catch (e) {} } });
+  if (/debug/.test(location.hash)) document.body.classList.add('debug');
   window.__mahou = { cast, countSpells, meter: () => ({ on: !!mAn, lvl: mLvl, peak: mPeak }), heard: (t) => heard([[{ transcript: t }]], 0) };
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();

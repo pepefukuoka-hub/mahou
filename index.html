@@ -10,7 +10,7 @@
 <title>魔法</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 <main id="start" class="screen">
@@ -30,7 +30,7 @@
   <p class="msg" id="step" role="status"></p>
   <p class="err" id="err" role="alert"></p>
   <p class="msg">カメラとマイクと、スマホの向きの許可が要ります。映像は、外に送りません。声は、スマホ会社(iPhoneはApple、AndroidはGoogle)の聞き取りの仕組みに送られます。電波のある所で使ってください。</p>
-  <p class="msg" id="ver">版 3</p>
+  <p class="msg" id="ver">版 4</p>
 </main>
 
 <div id="stage" hidden>
@@ -47,24 +47,18 @@
   <button type="button" id="bookBtn" aria-label="必殺の本を開く"><span>📖</span><small>必殺の本</small></button>
   <section id="book" hidden aria-label="必殺の本">
     <div class="cover">
-      <div class="page" id="page">
-        <div class="pno" id="pno"></div>
-        <div class="pic" id="pic"></div>
-        <div class="pname" id="pname"></div>
-        <div class="psay" id="psay"></div>
-        <div class="pdesc" id="pdesc"></div>
-        <button type="button" class="cast" id="pcast">この魔法を出す</button>
-      </div>
+      <div class="page" id="page"><span class="pic" id="pic"></span><span class="pname" id="pname"></span><span class="pno" id="pno"></span></div>
       <div class="nav">
         <button type="button" id="pprev" aria-label="前のページ">◀</button>
-        <button type="button" id="pclose">とじる</button>
+        <button type="button" class="cast" id="pcast">出す</button>
         <button type="button" id="pnext" aria-label="次のページ">▶</button>
+        <button type="button" id="pclose" aria-label="とじる">✕</button>
       </div>
     </div>
   </section>
 </div>
 
 <script src="vendor/aframe.min.js"></script>
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>
