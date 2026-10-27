@@ -1,5 +1,5 @@
 // 一度開いたあとは、電波がなくても開ける(声の聞き取りだけは、電波が要る)
-const CACHE = 'mahou-v6';
+const CACHE = 'mahou-v7';
 const FILES = ['./', 'index.html', 'app.js', 'style.css', 'vendor/aframe.min.js', 'manifest.webmanifest', 'icon-180.png', 'icon-512.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => {

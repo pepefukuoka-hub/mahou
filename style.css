@@ -49,3 +49,4 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 #book .nav button.cast { flex: 1; font-weight: 700; color: #fff; background: linear-gradient(90deg, #8a3cff, #4a7bff); border: 0; }
 #diag { display: none; }
 body.debug #diag { display: block; }
+#quit { position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); bottom: max(14px, env(safe-area-inset-bottom, 0px)); width: auto; min-height: 40px; padding: 4px 14px; font-size: 14px; background: rgba(36,21,67,.85); border: 1px solid #e8c36a; color: #f4e3b0; }

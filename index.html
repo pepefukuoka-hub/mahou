@@ -10,7 +10,7 @@
 <title>魔法</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
 <main id="start" class="screen">
@@ -31,7 +31,7 @@
   <p class="msg" id="step" role="status"></p>
   <p class="err" id="err" role="alert"></p>
   <p class="msg">カメラとマイクと、スマホの向きの許可が要ります。映像は、外に送りません。声は、スマホ会社(iPhoneはApple、AndroidはGoogle)の聞き取りの仕組みに送られます。電波のある所で使ってください。</p>
-  <p class="msg" id="ver">版 6</p>
+  <p class="msg" id="ver">版 7</p>
 </main>
 
 <div id="stage" hidden>
@@ -46,6 +46,7 @@
     <div id="raw"></div>
     <div id="diag"></div>
   </div>
+  <button type="button" id="quit" aria-label="おわり(マイクとカメラを止める)">おわり</button>
   <button type="button" id="bookBtn" aria-label="必殺の本を開く"><span>📖</span><small>必殺の本</small></button>
   <section id="book" hidden aria-label="必殺の本">
     <div class="cover">
@@ -61,6 +62,6 @@
 </div>
 
 <script src="vendor/aframe.min.js"></script>
-<script src="app.js?v=6"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>

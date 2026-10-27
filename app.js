@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const VER = 6;
+  const VER = 7;
   const $ = (id) => document.getElementById(id);
   const GROUND = -1.4;   // 目の高さ 1.4 m と見なした、地面の高さ
 
@@ -722,7 +722,7 @@
       window.addEventListener('resize', () => {});
       requestAnimationFrame(loop);
       try { navigator.wakeLock && navigator.wakeLock.request('screen').catch(() => {}); } catch (e) {}
-      startMeter().then(() => setTimeout(() => startRec(), 400));   // マイクの許可は、画面が出てから
+      micWanted = true; startMeter().then(() => setTimeout(() => startRec(), 400));   // マイクの許可は、画面が出てから
       $('meter').addEventListener('click', () => { if (mAn) stopMeter(); else startMeter(); });
     } catch (e) {
       err.textContent = '始められませんでした: ' + (e && e.name ? e.name + ' ' : '') + (e && e.message || e);
@@ -732,7 +732,13 @@
   $('go').addEventListener('click', start);
   window.addEventListener('pointerdown', ensureAudio); window.addEventListener('touchend', ensureAudio);
   $('ver').textContent = '版 ' + VER;
-  document.addEventListener('visibilitychange', () => { if (!document.hidden && wantRec && rec) { try { rec.start(); } catch (e) {} } });
+  // マイクは、画面が見えている間だけ使う。ほかのアプリや画面に切りかえたら、すぐ止める(iPhoneの、オレンジの点を残さない)
+  let micWanted = false;
+  function micOff() { wantRec = false; try { rec && rec.abort(); } catch (e) {} stopMeter(); try { ac && ac.suspend(); } catch (e) {} setMic('💤'); }
+  function micOn() { if (!micWanted) return; try { ac && ac.resume(); } catch (e) {} startMeter().then(() => setTimeout(() => startRec(), 300)); }
+  document.addEventListener('visibilitychange', () => { if (document.hidden) micOff(); else micOn(); });
+  window.addEventListener('pagehide', micOff);
+  $('quit').addEventListener('click', () => { micOff(); try { const v = $('cam'); v.srcObject && v.srcObject.getTracks().forEach((t) => t.stop()); } catch (e) {} location.reload(); });
   if (/debug/.test(location.hash)) document.body.classList.add('debug');
   window.__mahou = { cast, countSpells, meter: () => ({ on: !!mAn, lvl: mLvl, peak: mPeak }), heard: (t) => heard([[{ transcript: t }]], 0) };
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
