@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const VER = 4;
+  const VER = 5;
   const $ = (id) => document.getElementById(id);
   const GROUND = -1.4;   // 目の高さ 1.4 m と見なした、地面の高さ
 
@@ -14,6 +14,7 @@
     hanabi: { icon: '🎆', label: '花火', desc: '夜空に、大きな花火が3発。', words: ['花火', 'ハナビ', 'ファイヤーワークス', 'ファイアーワークス', 'fireworks'] },
     heart: { icon: '💖', label: 'ハート', desc: 'ハートが、ふわふわ空にのぼる。', words: ['ハート', 'ラブ', '愛', 'heart', 'love'] },
     star: { icon: '⭐', label: 'スター', desc: '流れ星が、ツーッと流れる。', words: ['スター', '流れ星', 'ナガレボシ', '星', 'ホシ', 'star'] },
+    kamehameha: { icon: '☄️', label: 'カメハメハ', cd: 7000, desc: '気をためて、すごいビームを発射する。', words: ['カメハメハ', 'カメハメ波', 'カメハメ', 'かめはめ波', 'kamehameha', '亀波'] },
   };
   const WORD_LIST = [];
   Object.keys(SPELLS).forEach((k) => SPELLS[k].words.forEach((w) => WORD_LIST.push([toKata(w).toLowerCase(), k])));
@@ -87,43 +88,107 @@
 
   // ---------- 絵(コードで描く) ----------
   const tex = {};
-  function glowTex() {
-    const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
-    const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.3, 'rgba(255,255,255,.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
-    g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new T.CanvasTexture(c);
+  const cv = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h || w; return c; };
+  const V = (x, y, z) => new T.Vector3(x, y, z);
+  function radial(size, stops) {
+    const c = cv(size), g = c.getContext('2d'), h = size / 2, gr = g.createRadialGradient(h, h, 0, h, h, h);
+    stops.forEach(([o, a]) => gr.addColorStop(o, 'rgba(255,255,255,' + a + ')'));
+    g.fillStyle = gr; g.fillRect(0, 0, size, size); return c;
+  }
+  function flameCanvas() {   // しずく形の炎
+    const c = cv(128, 192), g = c.getContext('2d');
+    const blob = (cx, cy, rx, ry, a) => { g.save(); g.translate(cx, cy); g.scale(rx / ry, 1); const gr = g.createRadialGradient(0, 0, 0, 0, 0, ry); gr.addColorStop(0, 'rgba(255,255,255,' + a + ')'); gr.addColorStop(0.5, 'rgba(255,255,255,' + a * 0.55 + ')'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, ry, 0, 7); g.fill(); g.restore(); };
+    blob(64, 128, 58, 58, 1); blob(64, 92, 36, 60, 0.9); blob(64, 56, 20, 52, 0.8); blob(64, 30, 9, 30, 0.7);
+    return c;
+  }
+  function smokeCanvas() {
+    const c = cv(128), g = c.getContext('2d');
+    for (let i = 0; i < 9; i++) {
+      const x = 64 + (Math.random() - 0.5) * 44, y = 64 + (Math.random() - 0.5) * 44, r = 26 + Math.random() * 22, gr = g.createRadialGradient(x, y, 0, x, y, r);
+      gr.addColorStop(0, 'rgba(255,255,255,.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+    }
+    return c;
+  }
+  function flakeCanvas() {   // 雪の結晶
+    const c = cv(128), g = c.getContext('2d');
+    g.translate(64, 64); g.strokeStyle = '#fff'; g.lineCap = 'round'; g.shadowColor = '#cfeaff'; g.shadowBlur = 8;
+    for (let i = 0; i < 6; i++) {
+      g.save(); g.rotate(i * Math.PI / 3);
+      g.lineWidth = 6; g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -54); g.stroke();
+      g.lineWidth = 4; [[-22, 16], [-38, 11]].forEach(([y, l]) => { g.beginPath(); g.moveTo(0, y); g.lineTo(-l, y - l * 0.9); g.moveTo(0, y); g.lineTo(l, y - l * 0.9); g.stroke(); });
+      g.restore();
+    }
+    return c;
+  }
+  function sparkCanvas() {   // きらっと光る十字
+    const c = cv(128), g = c.getContext('2d');
+    g.drawImage(radial(128, [[0, 1], [0.25, 0.5], [1, 0]]), 0, 0);
+    const bar = (w, h) => { const gr = g.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.5, 'rgba(255,255,255,.95)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); };
+    g.save(); g.translate(0, 62); bar(128, 4); g.restore();
+    g.save(); g.translate(62, 128); g.rotate(-Math.PI / 2); bar(128, 4); g.restore();
+    return c;
+  }
+  function heartCanvas() {
+    const c = cv(128), g = c.getContext('2d');
+    g.translate(64, 62); g.scale(3.1, 3.1); g.beginPath();
+    for (let i = 0; i <= 60; i++) { const a = i / 60 * Math.PI * 2, x = 16 * Math.pow(Math.sin(a), 3), y = -(13 * Math.cos(a) - 5 * Math.cos(2 * a) - 2 * Math.cos(3 * a) - Math.cos(4 * a)); i ? g.lineTo(x * 0.9, y * 0.9) : g.moveTo(x * 0.9, y * 0.9); }
+    const gr = g.createRadialGradient(-5, -6, 1, 0, 0, 18); gr.addColorStop(0, '#ffd1e6'); gr.addColorStop(0.5, '#ff5fa2'); gr.addColorStop(1, '#d81b60');
+    g.shadowColor = '#ff7ab8'; g.shadowBlur = 7; g.fillStyle = gr; g.fill();
+    return c;
+  }
+  function starCanvas() {
+    const c = cv(128), g = c.getContext('2d');
+    g.drawImage(radial(128, [[0, 0.5], [1, 0]]), 0, 0);
+    g.translate(64, 66); g.beginPath();
+    for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 22 : 50; i ? g.lineTo(Math.cos(a) * r, Math.sin(a) * r) : g.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
+    g.closePath(); const gr = g.createRadialGradient(0, 0, 4, 0, 0, 50); gr.addColorStop(0, '#fffbe0'); gr.addColorStop(1, '#ffc928');
+    g.shadowColor = '#ffe27a'; g.shadowBlur = 10; g.fillStyle = gr; g.fill();
+    return c;
+  }
+  function boltCanvas() {   // いなずまの帯の、横の濃さ
+    const c = cv(64, 4), g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 64, 0);
+    gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.3, 'rgba(255,255,255,.35)'); gr.addColorStop(0.5, 'rgba(255,255,255,1)'); gr.addColorStop(0.7, 'rgba(255,255,255,.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 4); return c;
   }
   function emojiTex(ch) {
-    const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+    const c = cv(128), g = c.getContext('2d');
     g.font = '96px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(ch, 64, 70); return new T.CanvasTexture(c);
   }
   function initTex() {
-    tex.glow = glowTex();
-    ['🍙', '❄️', '💖', '⭐', '✨'].forEach((e) => { tex[e] = emojiTex(e); });
+    tex.glow = new T.CanvasTexture(radial(64, [[0, 1], [0.3, 0.55], [1, 0]]));
+    tex.flame = new T.CanvasTexture(flameCanvas()); tex.smoke = new T.CanvasTexture(smokeCanvas()); tex.flake = new T.CanvasTexture(flakeCanvas());
+    tex.spark = new T.CanvasTexture(sparkCanvas()); tex.heart = new T.CanvasTexture(heartCanvas()); tex.star = new T.CanvasTexture(starCanvas());
+    tex.bolt = new T.CanvasTexture(boltCanvas()); tex.ring = new T.CanvasTexture(radial(128, [[0, 0], [0.62, 0], [0.82, 1], [0.94, 0.35], [1, 0]]));
+    tex['🍙'] = emojiTex('🍙');
+    scene.add(new T.AmbientLight(0xffffff, 0.85)); const dl = new T.DirectionalLight(0xffffff, 0.9); dl.position.set(0.4, 1, 0.6); scene.add(dl);
   }
 
   // ---------- 粒 ----------
-  const parts = [], emitters = [];
-  // o: tex, pos, vel, life, size, grow, g, color(hex または (t,color)=>void), add, op, pw, floor, onDie
+  const parts = [], emitters = [], fxs = [];
+  // o: tex, pos, vel, life, size, aspect, grow, g, drag, spin, trail, color(hex または (t,color)=>void), add, op, pw, fadeIn, floor, onFloor
   function spawn(o) {
-    if (parts.length > 1100) return;
+    if (parts.length > 4000) return;
     const m = new T.SpriteMaterial({ map: tex[o.tex || 'glow'], transparent: true, depthWrite: false, depthTest: false, blending: o.add ? T.AdditiveBlending : T.NormalBlending, opacity: o.op == null ? 1 : o.op });
-    if (typeof o.color === 'number') m.color.setHex(o.color);
-    const s = new T.Sprite(m); s.position.copy(o.pos); s.scale.setScalar(o.size);
+    if (typeof o.color === 'number') m.color.setHex(o.color); else if (typeof o.color === 'function') o.color(0, m.color);
+    if (o.rot) m.rotation = o.rot;
+    const s = new T.Sprite(m); s.position.copy(o.pos); s.scale.set(o.size * (o.aspect || 1), o.size, 1); s.renderOrder = o.add ? 2 : 1;
     scene.add(s);
-    parts.push({ s, m, v: o.vel || new T.Vector3(), age: 0, o: Object.assign({ life: 1, grow: 1, g: 0, op: 1, pw: 1 }, o) });
+    parts.push({ s, m, v: o.vel || new T.Vector3(), age: 0, tr: 0, o: Object.assign({ life: 1, grow: 1, g: 0, op: 1, pw: 1, aspect: 1, drag: 0, spin: 0 }, o) });
   }
   function updateParts(dt) {
     for (let i = parts.length - 1; i >= 0; i--) {
       const p = parts[i], o = p.o; p.age += dt;
       const t = p.age / o.life;
-      p.v.y += o.g * dt; p.s.position.addScaledVector(p.v, dt);
+      p.v.y += o.g * dt; if (o.drag) p.v.multiplyScalar(Math.max(0, 1 - o.drag * dt));
+      p.s.position.addScaledVector(p.v, dt);
       let dead = t >= 1;
       if (o.floor && p.s.position.y < GROUND) { dead = true; if (o.onFloor) o.onFloor(p.s.position); }
       if (dead) { scene.remove(p.s); p.m.dispose(); parts.splice(i, 1); continue; }
-      p.s.scale.setScalar(o.size * (1 + (o.grow - 1) * t));
+      const sz = o.size * (1 + (o.grow - 1) * t); p.s.scale.set(sz * o.aspect, sz, 1);
       p.m.opacity = o.op * Math.pow(1 - t, o.pw) * Math.min(1, t / (o.fadeIn || 0.001));
+      if (o.spin) p.m.rotation = (o.rot || 0) + o.spin * p.age;
       if (typeof o.color === 'function') o.color(t, p.m.color);
+      if (o.trail) { p.tr -= dt; if (p.tr <= 0) { p.tr = o.trail; spawn({ pos: p.s.position.clone(), size: sz * 0.7, life: 0.5, add: true, color: p.m.color.getHex(), op: p.m.opacity * 0.6 }); } }
     }
   }
   function updateEmitters(dt) {
@@ -137,6 +202,74 @@
   }
   const emit = (delay, dur, fn) => emitters.push({ start: performance.now() + delay, end: performance.now() + delay + dur, fn });
 
+  // 立体のもの(いなずま・ビーム・氷の柱)。life 秒たつと消える
+  function addFx(objs, life, upd) { objs.forEach((m) => { m.frustumCulled = false; scene.add(m); }); fxs.push({ objs, life, t: 0, upd }); }
+  function updateFx(dt) {
+    for (let i = fxs.length - 1; i >= 0; i--) {
+      const x = fxs[i]; x.t += dt; const u = x.t / x.life;
+      if (u >= 1) { x.objs.forEach((m) => { scene.remove(m); if (m.isMesh) { m.geometry.dispose(); m.material.dispose(); } else if (m.material) m.material.dispose(); }); fxs.splice(i, 1); continue; }
+      x.upd(u, x.t, dt);
+    }
+  }
+  const addMat = (color, op, map) => new T.MeshBasicMaterial({ color, map: map || null, transparent: true, opacity: op, blending: T.AdditiveBlending, depthTest: false, depthWrite: false, side: T.DoubleSide });
+  function groundRing(pos, maxR, color, life, op) {
+    const geo = new T.RingGeometry(0.82, 1, 48); geo.rotateX(-Math.PI / 2);
+    const mat = addMat(color, op), m = new T.Mesh(geo, mat); m.position.set(pos.x, GROUND + 0.03, pos.z); m.scale.setScalar(0.01); m.renderOrder = 2;
+    addFx([m], life, (u) => { m.scale.setScalar(Math.max(0.01, maxR * (1 - Math.pow(1 - u, 3)))); mat.opacity = op * (1 - u); });
+  }
+  // 点の列を、カメラ(原点)の方を向いた帯にする。w は帯の半分の太さ
+  function ribbon(pts, w) {
+    const n = pts.length, pos = new Float32Array(n * 6), uv = new Float32Array(n * 4), idx = [];
+    const side = new T.Vector3(), dir = new T.Vector3(), cam = new T.Vector3();
+    for (let i = 0; i < n; i++) {
+      dir.subVectors(pts[Math.min(n - 1, i + 1)], pts[Math.max(0, i - 1)]).normalize(); cam.copy(pts[i]).negate().normalize();
+      side.crossVectors(dir, cam).normalize();
+      const ww = w * (0.55 + 0.45 * Math.sin(Math.PI * Math.min(1, (i + 1) / n)) + 0.2);
+      for (let s = 0; s < 2; s++) { const sg = s ? 1 : -1, k = (i * 2 + s) * 3; pos[k] = pts[i].x + side.x * ww * sg; pos[k + 1] = pts[i].y + side.y * ww * sg; pos[k + 2] = pts[i].z + side.z * ww * sg; uv[(i * 2 + s) * 2] = s; uv[(i * 2 + s) * 2 + 1] = i / (n - 1); }
+      if (i < n - 1) idx.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
+    }
+    const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.BufferAttribute(uv, 2)); geo.setIndex(idx); return geo;
+  }
+  function jag(a, b, disp, depth, out) {   // まん中をずらしながら、ぎざぎざの線にする
+    if (depth === 0) { out.push(b); return; }
+    const m = a.clone().lerp(b, R(0.4, 0.6)).add(V(R(-1, 1), R(-0.15, 0.15), R(-1, 1)).multiplyScalar(disp));
+    jag(a, m, disp * 0.55, depth - 1, out); jag(m, b, disp * 0.55, depth - 1, out);
+  }
+  function boltPolys(top, base, depth, disp, branches) {
+    const main = [top.clone()]; jag(top, base, disp, depth, main);
+    const polys = [{ pts: main, w: 1 }];
+    if (branches) for (let i = 10; i < main.length - 6; i += Math.round(R(6, 12))) {
+      const dir = V(R(-1, 1), -R(0.5, 1.1), R(-1, 1)).normalize(), len = R(3, 8) * (1 - i / main.length * 0.5), b = [main[i].clone()];
+      jag(main[i], main[i].clone().addScaledVector(dir, len), len * 0.35, 4, b); polys.push({ pts: b, w: 0.45 });
+    }
+    return polys;
+  }
+  function flick(t, life) {   // ピカ、ピカッ、と、またたく
+    if (t < 0.07) return 1; if (t < 0.11) return 0.15; if (t < 0.19) return 1; if (t < 0.24) return 0.35; if (t < 0.3) return 0.9;
+    return Math.max(0, 1 - (t - 0.3) / Math.max(0.05, life - 0.3)) * 0.8;
+  }
+  function boltFx(polys, ws, life, glowHex) {
+    const gm = addMat(glowHex, 0.6, tex.bolt), mm = addMat(0xd8e6ff, 0.9, tex.bolt), cm = addMat(0xffffff, 1, tex.bolt), objs = [];
+    polys.forEach((pl) => { objs.push(new T.Mesh(ribbon(pl.pts, 0.5 * ws * pl.w), gm), new T.Mesh(ribbon(pl.pts, 0.17 * ws * pl.w), mm), new T.Mesh(ribbon(pl.pts, 0.05 * ws * pl.w), cm)); });
+    objs.forEach((o) => { o.renderOrder = 3; });
+    addFx(objs, life, (u, t) => { const k = flick(t, life); gm.opacity = 0.6 * k; mm.opacity = 0.9 * k; cm.opacity = k; });
+  }
+
+  // ---------- 画面のゆれ・ふち取り・ひかり ----------
+  let shake = 0;
+  const kick = (a) => { shake = Math.max(shake, a); };
+  function applyShake(dt) {
+    shake = Math.max(0, shake - dt * 0.9); const s = $('stage');
+    if (shake > 0.01) s.style.transform = 'translate(' + (R(-1, 1) * shake * 16).toFixed(1) + 'px,' + (R(-1, 1) * shake * 16).toFixed(1) + 'px) scale(1.05)'; else if (s.style.transform) s.style.transform = '';
+  }
+  let veilTok = 0;
+  function veil(bg, op, inMs, holdMs, outMs) {
+    const v = $('veil'), tok = ++veilTok; v.style.transition = 'none'; v.style.background = bg; v.style.opacity = 0;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (tok !== veilTok) return; v.style.transition = 'opacity ' + inMs + 'ms ease-out'; v.style.opacity = op;
+      setTimeout(() => { if (tok !== veilTok) return; v.style.transition = 'opacity ' + outMs + 'ms ease-in'; v.style.opacity = 0; }, inMs + holdMs);
+    }));
+  }
   const flashEl = () => $('flash');
   function flash(color, op, ms) {
     const f = flashEl(); f.style.transition = 'none'; f.style.background = color; f.style.opacity = op;
@@ -145,12 +278,17 @@
   const buzz = (n) => { try { navigator.vibrate && navigator.vibrate(n); } catch (e) {} };
 
   // ---------- 音(その場で作る) ----------
-  let ac = null, nb = null;
+  let ac = null, nb = null, bus = null;
   function initAudio() {
     try {
       const AC = window.AudioContext || window.webkitAudioContext; ac = new AC();
       nb = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate); const d = nb.getChannelData(0);
       for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      const comp = ac.createDynamicsCompressor(); comp.connect(ac.destination);
+      bus = ac.createGain(); bus.gain.value = 0.9; bus.connect(comp);
+      const conv = ac.createConvolver(), n = Math.floor(ac.sampleRate * 2.2), ir = ac.createBuffer(2, n, ac.sampleRate);   // ひびき(エコー)
+      for (let c = 0; c < 2; c++) { const x = ir.getChannelData(c); for (let i = 0; i < n; i++) x[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2.5); }
+      conv.buffer = ir; const wet = ac.createGain(); wet.gain.value = 0.3; bus.connect(wet); wet.connect(conv); conv.connect(comp);
       if (navigator.audioSession) navigator.audioSession.type = 'play-and-record';
     } catch (e) { ac = null; }
   }
@@ -160,74 +298,113 @@
     const s = ac.createBufferSource(); s.buffer = nb; s.loop = true;
     const f = ac.createBiquadFilter(); f.type = type; f.frequency.value = freq; if (q) f.Q.value = q;
     const g = ac.createGain(); env(g, t0, Math.min(0.03, dur / 3), dur, peak);
-    s.connect(f); f.connect(g); g.connect(ac.destination); s.start(t0, Math.random()); s.stop(t0 + dur + 0.1);
+    s.connect(f); f.connect(g); g.connect(bus); s.start(t0, Math.random()); s.stop(t0 + dur + 0.1);
   }
   function tone(delay, f0, f1, dur, peak, type) {
     if (!ac) return; const t0 = ac.currentTime + delay;
     const o = ac.createOscillator(); o.type = type || 'sine'; o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
-    const g = ac.createGain(); env(g, t0, 0.02, dur, peak); o.connect(g); g.connect(ac.destination); o.start(t0); o.stop(t0 + dur + 0.1);
+    const g = ac.createGain(); env(g, t0, 0.02, dur, peak); o.connect(g); g.connect(bus); o.start(t0); o.stop(t0 + dur + 0.1);
+  }
+  function rise(delay, f0, f1, dur, peak, type) {   // だんだん高く、大きくなる音
+    if (!ac) return; const t0 = ac.currentTime + delay;
+    const o = ac.createOscillator(); o.type = type || 'sine'; o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+    const g = ac.createGain(); env(g, t0, dur * 0.92, dur * 0.08, peak); o.connect(g); g.connect(bus); o.start(t0); o.stop(t0 + dur + 0.1);
+  }
+  function wind(delay, dur, peak, f0, f1) {   // ゴーッという風
+    if (!ac) return; const t0 = ac.currentTime + delay;
+    const s = ac.createBufferSource(); s.buffer = nb; s.loop = true;
+    const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.2; f.frequency.setValueAtTime(f0, t0); f.frequency.linearRampToValueAtTime(f1, t0 + dur);
+    const lfo = ac.createOscillator(), lg = ac.createGain(); lfo.frequency.value = 0.9; lg.gain.value = f0 * 0.45; lfo.connect(lg); lg.connect(f.frequency);
+    const g = ac.createGain(); env(g, t0, dur * 0.3, dur * 0.7, peak);
+    s.connect(f); f.connect(g); g.connect(bus); s.start(t0, Math.random()); lfo.start(t0); s.stop(t0 + dur + 0.1); lfo.stop(t0 + dur + 0.1);
   }
   const SND = {
-    thunder() { noise(0, 0.25, 'highpass', 2500, 0.8); noise(0.05, 2.4, 'lowpass', 220, 1.0); tone(0.05, 70, 35, 1.6, 0.6); },
-    fire() { for (let i = 0; i < 18; i++) noise(R(0, 3), 0.04, 'bandpass', R(900, 2500), 0.5, 2); noise(0, 3.4, 'lowpass', 500, 0.25); },
-    water() { noise(0, 3.6, 'bandpass', 1400, 0.3, 0.7); for (let i = 0; i < 10; i++) tone(R(0, 3), R(500, 900), R(1200, 1800), 0.08, 0.15); },
+    thunder() {
+      noise(0, 0.2, 'highpass', 1800, 1.0); noise(0, 0.6, 'bandpass', 900, 0.9, 0.7);   // バリッ
+      noise(0.03, 3.4, 'lowpass', 260, 1.0); tone(0.03, 62, 26, 2.6, 0.9); noise(0.8, 2.8, 'lowpass', 150, 0.7);   // ゴロゴロ
+      noise(0.18, 0.15, 'highpass', 2200, 0.7); noise(0.34, 0.12, 'highpass', 2200, 0.55); tone(0.18, 80, 30, 1.4, 0.5);
+    },
+    fire() { noise(0, 1.0, 'bandpass', 700, 0.9, 0.6); for (let i = 0; i < 26; i++) noise(R(0, 3.6), 0.04, 'bandpass', R(900, 2800), 0.5, 2); noise(0, 4.2, 'lowpass', 420, 0.35); tone(0, 90, 50, 0.7, 0.5); },
+    water() { noise(0, 3.8, 'bandpass', 1400, 0.3, 0.7); noise(0, 3.8, 'highpass', 4000, 0.1); for (let i = 0; i < 14; i++) tone(R(0, 3.4), R(500, 900), R(1200, 1800), 0.08, 0.15); },
     onigiri() { for (let i = 0; i < 10; i++) tone(i * 0.09, R(500, 700), R(900, 1300), 0.1, 0.3, 'triangle'); },
-    ice() { [1319, 1568, 1976, 2349, 2637].forEach((f, i) => tone(i * 0.12, f, f * 0.99, 0.7, 0.2)); },
-    hanabi() { for (let i = 0; i < 3; i++) { noise(i * 0.55, 0.5, 'lowpass', 160, 1.0); tone(i * 0.55, 90, 40, 0.5, 0.6); noise(i * 0.55 + 0.1, 1.2, 'highpass', 5000, 0.25); } },
-    heart() { tone(0, 660, 700, 0.4, 0.3); tone(0.15, 880, 920, 0.5, 0.3); tone(0.3, 1320, 1350, 0.6, 0.2); },
-    star() { tone(0, 2600, 500, 0.9, 0.25, 'triangle'); [0.3, 0.5, 0.7].forEach((d) => tone(d, R(2000, 3000), 1500, 0.3, 0.12)); },
+    ice() {
+      wind(0, 5.4, 0.55, 450, 1100); wind(0.2, 5, 0.25, 1500, 2600); tone(0, 90, 60, 1.4, 0.35);
+      for (let i = 0; i < 16; i++) { const f = R(2200, 4600); tone(R(0, 4.2), f, f * 0.98, 0.6, 0.07); }
+      for (let i = 0; i < 12; i++) noise(R(0.1, 1.4), 0.05, 'highpass', 3500, 0.45);   // 氷がきしむ音
+    },
+    shot(d) {
+      tone(d, 500, 1800, 0.85, 0.05); noise(d + 0.85, 0.5, 'lowpass', 180, 1.0); tone(d + 0.85, 100, 40, 0.5, 0.7); noise(d + 0.88, 1.4, 'highpass', 4500, 0.3);
+      for (let i = 0; i < 14; i++) noise(d + 0.95 + R(0, 1.2), 0.03, 'highpass', 5000, 0.35);
+    },
+    heart() { [660, 880, 1320, 1760].forEach((f, i) => tone(i * 0.14, f, f * 1.02, 0.9, 0.22)); tone(0.9, 90, 80, 0.25, 0.4); tone(1.2, 90, 80, 0.25, 0.3); },
+    star() { for (let i = 0; i < 6; i++) tone(i * 0.22, 2600, 500, 0.9, 0.18, 'triangle'); [0.3, 0.5, 0.7, 1.1, 1.4].forEach((d) => tone(d, R(2000, 3000), 1500, 0.3, 0.12)); },
+    kame() {
+      rise(0, 140, 2600, 1.65, 0.16, 'sawtooth'); rise(0, 55, 220, 1.65, 0.5); rise(0, 300, 3500, 1.65, 0.16, 'triangle'); wind(0, 1.7, 0.35, 300, 2800);
+      noise(1.7, 2.7, 'lowpass', 1200, 0.9); noise(1.7, 2.7, 'highpass', 3500, 0.18); tone(1.7, 110, 90, 2.7, 0.5, 'sawtooth'); tone(1.7, 55, 50, 2.7, 0.7); tone(1.72, 440, 330, 2.5, 0.12, 'square');
+      noise(2.2, 0.3, 'highpass', 1500, 0.9); noise(2.2, 3, 'lowpass', 200, 1.0); tone(2.2, 70, 26, 2.2, 0.9);
+    },
   };
 
   // ---------- 魔法のしくみ ----------
   const MAGIC = {
     thunder() {
       const f = fwd();
-      [0, 0.22].forEach((delay, k) => setTimeout(() => {
-        const base = at(f, R(4, 7), R(-2.5, 2.5), GROUND), top = base.clone().add(new T.Vector3(R(-1, 1), 9, R(-1, 1)));
-        const N = 26; let prev = top.clone();
-        for (let i = 0; i <= N; i++) {
-          const u = i / N, p = top.clone().lerp(base, u); if (i > 0 && i < N) { p.x += R(-0.45, 0.45); p.z += R(-0.45, 0.45); }
-          for (let s = 0; s <= 3; s++) {   // 点と点の間を、光でつなぐ
-            const q = prev.clone().lerp(p, s / 3);
-            spawn({ pos: q, size: 0.9, life: 0.35, add: true, color: 0x8fb4ff, op: 0.9, pw: 1.5 });
-            spawn({ pos: q.clone(), size: 0.3, life: 0.28, add: true, color: 0xffffff, op: 1, pw: 1.2 });
-          }
-          if (i % 6 === 3) {   // 枝わかれ
-            let b = p.clone(); const dir = new T.Vector3(R(-1, 1), R(-1, -0.2), R(-1, 1)).normalize();
-            for (let j = 0; j < 5; j++) { b.addScaledVector(dir, 0.5).add(new T.Vector3(R(-0.15, 0.15), 0, R(-0.15, 0.15))); spawn({ pos: b.clone(), size: 0.35, life: 0.25, add: true, color: 0xbcd0ff, op: 0.8 }); }
-          }
-          prev = p;
-        }
-        for (let i = 0; i < 40; i++) spawn({ pos: base.clone(), vel: new T.Vector3(R(-3, 3), R(1, 6), R(-3, 3)), g: -9, size: 0.16, life: R(0.5, 1), add: true, color: 0xffee88, pw: 1 });
-        spawn({ pos: base.clone().setY(GROUND + 0.3), size: 3, life: 0.5, add: true, color: 0xaac4ff, op: 0.8 });
-        flash('#dfe8ff', k === 0 ? 0.85 : 0.6, 350); buzz(k === 0 ? 120 : 60);
-      }, delay * 1000));
+      const strike = (delay, fd, lat, big) => setTimeout(() => {
+        const base = at(f, fd, lat, GROUND), top = base.clone().add(V(R(-3, 3), 36, R(-3, 3)));
+        boltFx(boltPolys(top, base, 7, 4.5, true), big ? 1.3 : 0.8, 0.9, 0x6c8cff);
+        for (let i = 0; i < 90; i++) spawn({ tex: 'spark', pos: base.clone(), vel: V(R(-6, 6), R(1, 9), R(-6, 6)), g: -12, size: R(0.15, 0.4), life: R(0.5, 1.1), add: true, color: 0xffee99, pw: 1 });
+        spawn({ pos: base.clone().setY(GROUND + 0.5), size: big ? 9 : 6, life: 0.6, add: true, color: 0xaac4ff, op: 0.9 });
+        spawn({ tex: 'spark', pos: base.clone().setY(GROUND + 0.5), size: big ? 12 : 8, life: 0.4, add: true, color: 0xffffff, op: 1 });
+        for (let i = 0; i < 4; i++) spawn({ tex: 'smoke', pos: base.clone().add(V(R(-1, 1), 0.2, R(-1, 1))), vel: V(R(-1.5, 1.5), R(0.5, 1.5), R(-1.5, 1.5)), size: R(2, 3.5), grow: 3, life: 1.8, color: 0x8892a8, op: 0.35 });   // 砂ぼこり
+        for (let i = 0; i < 3; i++) spawn({ tex: 'smoke', pos: at(f, fd, lat, 16 + i * 3), size: 28, life: 0.9, add: true, color: 0x7f9cff, op: 0.55, fadeIn: 0.05 });   // 雲が光る
+        groundRing(base, big ? 9 : 6, 0xaac4ff, 0.7, 0.9); groundRing(base, 3.5, 0xffffff, 0.4, 1);
+        flash('#e6ecff', big ? 1 : 0.7, big ? 600 : 420); kick(big ? 0.9 : 0.5); buzz(big ? [120, 30, 160] : 60);
+        if (big) setTimeout(() => flash('#ffffff', 0.8, 400), 130);
+      }, delay);
+      strike(0, R(7, 10), R(-2, 2), true); strike(190, R(9, 13), R(-8, -4), false); strike(360, R(9, 13), R(4, 8), false);
+      veil('radial-gradient(ellipse at center, rgba(120,150,255,0) 30%, rgba(80,100,220,.55) 100%)', 0.8, 120, 500, 1800);
       SND.thunder();
     },
     fire() {
       const f = fwd(), spots = [];
-      for (let i = 0; i < 14; i++) spots.push(at(f, R(2.5, 6), R(-3.5, 3.5), GROUND));
-      emit(0, 3800, (dt) => {
+      for (let i = 0; i < 16; i++) spots.push(at(f, R(2.2, 7), R(-4.8, 4.8), GROUND));
+      spots.forEach((p, i) => setTimeout(() => {   // ボッと燃え上がる
+        for (let k = 0; k < 7; k++) spawn({ tex: 'flame', aspect: 0.66, pos: p.clone().add(V(R(-0.3, 0.3), 1, R(-0.3, 0.3))), vel: V(R(-0.5, 0.5), R(2, 4), R(-0.5, 0.5)), size: R(2, 3.4), grow: 0.5, life: R(0.6, 1), add: true, op: 0.5, color: (t, c) => c.setHSL(0.11 - 0.1 * t, 1, 0.55 - 0.15 * t) });
+        spawn({ pos: p.clone().setY(GROUND + 0.4), size: 6, life: 0.7, add: true, color: 0xff8a2a, op: 0.6 });
+      }, i * 40));
+      emit(0, 4200, (dt, u) => {
+        const k = u < 0.8 ? 1 : (1 - u) / 0.2;
         spots.forEach((p) => {
-          if (Math.random() > dt * 22) return;
-          spawn({ pos: p.clone().add(new T.Vector3(R(-0.25, 0.25), 0, R(-0.25, 0.25))), vel: new T.Vector3(R(-0.2, 0.2), R(0.9, 1.9), R(-0.2, 0.2)), size: R(0.45, 0.8), grow: 0.25, life: R(0.8, 1.4), add: true, op: 0.45, pw: 0.7,
-            color: (t, c) => c.setHSL(0.1 - 0.1 * t, 1, 0.5 - 0.15 * t) });
+          if (Math.random() < dt * 24 * k) { const s = R(1.1, 2.3); spawn({ tex: 'flame', aspect: 0.66, pos: p.clone().add(V(R(-0.35, 0.35), s * 0.5, R(-0.35, 0.35))), vel: V(R(-0.3, 0.3), R(0.8, 1.9), R(-0.3, 0.3)), size: s, grow: 0.45, life: R(0.7, 1.3), add: true, op: 0.5, pw: 0.8, color: (t, c) => c.setHSL(0.12 - 0.12 * t, 1, 0.55 - 0.15 * t) }); }
+          if (Math.random() < dt * 4 * k) spawn({ tex: 'smoke', pos: p.clone().setY(GROUND + 2.2), vel: V(R(-0.3, 0.3), R(1, 1.8), R(-0.3, 0.3)), size: R(1.5, 2.4), grow: 2.4, life: 2.4, color: 0x262020, op: 0.4, spin: R(-0.4, 0.4) });
+          if (Math.random() < dt * 5 * k) spawn({ pos: p.clone().setY(GROUND + 0.5), size: R(3, 5), life: 0.5, add: true, color: 0xff7a1a, op: 0.3 });
         });
+        if (Math.random() < dt * 45 * k) { const p = spots[Math.floor(Math.random() * spots.length)]; spawn({ tex: 'spark', pos: p.clone().setY(GROUND + 0.6), vel: V(R(-1, 1), R(2.5, 6), R(-1, 1)), size: R(0.12, 0.3), life: R(1, 2.4), add: true, color: 0xffb347, g: -0.8, drag: 0.3 }); }
+        kick(0.08 * k);
       });
-      emit(0, 3800, (dt) => { if (Math.random() < dt * 8) { const p = spots[Math.floor(Math.random() * spots.length)]; spawn({ pos: p.clone().setY(GROUND + 0.5), vel: new T.Vector3(R(-0.4, 0.4), R(1.5, 3), R(-0.4, 0.4)), size: 0.1, life: R(0.8, 1.6), add: true, color: 0xffcc66, g: 0.5 }); } });
-      flash('#ff7a1a', 0.25, 600); SND.fire(); buzz(40);
+      veil('radial-gradient(ellipse at center, rgba(255,120,30,0) 35%, rgba(255,80,10,.5) 100%)', 0.85, 400, 2600, 1400);
+      flash('#ff8a2a', 0.5, 800); SND.fire(); buzz([60, 30, 40]);
     },
     water() {
       const f = fwd(), spots = [];
-      for (let i = 0; i < 7; i++) spots.push(at(f, R(2, 5), R(-4, 4), GROUND));
-      const splash = (p) => { for (let i = 0; i < 3; i++) spawn({ pos: p.clone().setY(GROUND + 0.02), vel: new T.Vector3(R(-0.8, 0.8), R(0.8, 1.6), R(-0.8, 0.8)), g: -9, size: 0.08, life: 0.5, color: 0xcdeaff, op: 0.8 }); };
-      emit(0, 3500, (dt) => {
+      for (let i = 0; i < 9; i++) spots.push(at(f, R(2, 6), R(-4.8, 4.8), GROUND));
+      const splash = (p) => {
+        for (let i = 0; i < 3; i++) spawn({ pos: p.clone().setY(GROUND + 0.02), vel: V(R(-1, 1), R(1, 2), R(-1, 1)), g: -9, size: 0.1, life: 0.5, color: 0xcdeaff, op: 0.8 });
+        if (Math.random() < 0.08) groundRing(p, R(0.6, 1.3), 0xcdeaff, 0.7, 0.5);
+      };
+      emit(0, 4000, (dt, u) => {
+        const k = u < 0.85 ? 1 : (1 - u) / 0.15;
         spots.forEach((p) => {
-          const n = Math.round(dt * 70);
-          for (let i = 0; i < n; i++) spawn({ pos: p.clone(), vel: new T.Vector3(R(-0.9, 0.9), R(3.8, 6), R(-0.9, 0.9)), g: -9.8, size: R(0.1, 0.2), life: 3, floor: true, onFloor: splash, color: 0x7fc4ff, op: 0.85, pw: 0.2 });
+          const n = Math.round(dt * 80 * k);
+          for (let i = 0; i < n; i++) spawn({ pos: p.clone(), vel: V(R(-0.9, 0.9), R(4.5, 7.2), R(-0.9, 0.9)), g: -9.8, size: R(0.12, 0.26), life: 3, floor: true, onFloor: splash, color: 0x8fcfff, op: 0.85, pw: 0.2 });
+          if (Math.random() < dt * 30 * k) spawn({ tex: 'spark', pos: p.clone().add(V(R(-0.3, 0.3), R(0.5, 3), R(-0.3, 0.3))), size: R(0.15, 0.35), life: 0.5, add: true, color: 0xffffff, op: 0.8 });
+          if (Math.random() < dt * 12 * k) spawn({ tex: 'smoke', pos: p.clone().setY(GROUND + 0.3), vel: V(R(-0.3, 0.3), R(0.6, 1.2), R(-0.3, 0.3)), size: R(1.2, 2), grow: 2.2, life: 1.5, color: 0xe4f3ff, op: 0.22 });
         });
+        kick(0.05 * k);
       });
-      flash('#3a8bff', 0.18, 500); SND.water(); buzz(30);
+      spots.forEach((p, i) => setTimeout(() => groundRing(p, 2.2, 0x9fd4ff, 0.9, 0.7), i * 60));
+      veil('radial-gradient(ellipse at center, rgba(60,140,255,0) 40%, rgba(40,110,255,.45) 100%)', 0.7, 500, 2500, 1400);
+      flash('#3a8bff', 0.25, 600); SND.water(); buzz(30);
     },
     onigiri() {
       const f = fwd(), r = rgt(f);
@@ -241,59 +418,154 @@
       SND.onigiri(); buzz(40);
     },
     ice() {
-      emit(0, 3200, (dt) => {
-        const n = Math.round(dt * 70);
+      const f = fwd(), r = rgt(f);
+      veil('radial-gradient(ellipse at center, rgba(190,235,255,0) 18%, rgba(150,210,255,.85) 100%)', 1, 900, 3000, 1800);
+      flash('#d8f2ff', 0.6, 1000); kick(0.3); groundRing(V(0, 0, 0), 11, 0xbfe8ff, 1.2, 0.6);
+      emit(0, 5200, (dt, u) => {   // ふぶき(右から左へ)
+        const k = Math.min(1, u * 6) * (u > 0.82 ? (1 - u) / 0.18 : 1);
+        const n = Math.round(dt * 650 * k);
         for (let i = 0; i < n; i++) {
-          const a = R(0, Math.PI * 2), rr = R(1, 5);
-          spawn({ tex: '❄️', pos: new T.Vector3(Math.cos(a) * rr, R(1.5, 3.5), Math.sin(a) * rr), vel: new T.Vector3(R(-0.3, 0.3), R(-1.1, -0.5), R(-0.3, 0.3)), size: R(0.18, 0.4), life: R(3, 4.5), op: 1, pw: 0.3 });
+          const near = Math.random() < 0.12, flake = Math.random() < 0.3;
+          spawn({ tex: flake ? 'flake' : 'glow', pos: at(f, near ? R(0.5, 3) : R(-2, 12), near ? R(2, 6) : R(5, 16), R(-2.5, 5)),
+            vel: r.clone().multiplyScalar(-R(near ? 14 : 9, near ? 22 : 16)).addScaledVector(f, R(-2, 2)).setY(R(-2.2, -0.4)), size: near ? R(0.3, 0.7) : R(0.14, flake ? 0.5 : 0.3),
+            life: R(0.9, 1.7), op: near ? 0.6 : 0.95, pw: 0.15, color: 0xeaf6ff, spin: flake ? R(-3, 3) : 0, rot: R(0, 6) });
         }
-        if (Math.random() < dt * 20) { const a = R(0, 6.28), rr = R(1.5, 5); spawn({ pos: new T.Vector3(Math.cos(a) * rr, R(-1, 2.5), Math.sin(a) * rr), size: R(0.2, 0.5), life: 0.7, add: true, color: 0xbfe8ff, op: 0.9 }); }
+        if (Math.random() < dt * 30 * k) spawn({ tex: 'smoke', pos: at(f, R(2, 10), R(6, 14), R(-1.5, 3)), vel: r.clone().multiplyScalar(-R(5, 9)), size: R(5, 9), grow: 1.4, life: R(1.5, 2.4), color: 0xe4f4ff, op: 0.3, fadeIn: 0.25, spin: R(-0.3, 0.3) });
+        if (Math.random() < dt * 22 * k) spawn({ tex: 'spark', pos: at(f, R(1, 8), R(-5, 5), R(-1, 3)), size: R(0.2, 0.6), life: 0.6, add: true, color: 0xcfeeff, op: 0.9 });
+        kick(0.1 * k);
       });
-      flash('#aee6ff', 0.4, 700); SND.ice(); buzz(30);
+      for (let i = 0; i < 16; i++) {   // 氷の柱が、地面からつき出す
+        const p = at(f, R(2.5, 9), R(-6, 6), GROUND), h = R(1.2, 3.8), rad = h * R(0.1, 0.16), geo = new T.ConeGeometry(rad, h, 5);
+        geo.translate(0, h / 2, 0);
+        const mat = new T.MeshLambertMaterial({ color: 0xcdeeff, emissive: 0x3a86b8, flatShading: true, transparent: true, opacity: 0.9 });
+        const m = new T.Mesh(geo, mat); m.position.copy(p); m.rotation.set(R(-0.25, 0.25), R(0, 6), R(-0.25, 0.25)); m.scale.y = 0.001; m.renderOrder = 1;
+        setTimeout(() => {
+          addFx([m], 4.2, (u, t) => { const g = Math.min(1, t / 0.35); m.scale.y = Math.max(0.001, 1 - Math.pow(1 - g, 3)); mat.opacity = 0.9 * Math.min(1, (1 - u) * 5); });
+          const tip = p.clone().setY(GROUND + h); spawn({ tex: 'spark', pos: tip, size: h * 0.7, life: 0.7, add: true, color: 0xcfeeff });
+          spawn({ tex: 'smoke', pos: p.clone().setY(GROUND + 0.3), vel: V(0, 0.4, 0), size: 2, grow: 2.5, life: 1.4, color: 0xe4f4ff, op: 0.4 });
+          for (let j = 0; j < 8; j++) spawn({ tex: 'glow', pos: p.clone().setY(GROUND + 0.2), vel: V(R(-2, 2), R(1, 4), R(-2, 2)), g: -7, size: 0.08, life: 0.8, add: true, color: 0xcfeeff });
+        }, R(0, 1300));
+      }
+      SND.ice(); buzz([40, 30, 40]);
     },
     hanabi() {
-      const f = fwd();
-      [0, 450, 950].forEach((delay) => setTimeout(() => {
-        const c = at(f, R(8, 12), R(-5, 5), R(2.5, 6)), hue = Math.random();
-        const hh = (hue + 0.5) % 1;
-        for (let i = 0; i < 110; i++) {
-          const d = new T.Vector3(R(-1, 1), R(-1, 1), R(-1, 1)).normalize().multiplyScalar(R(2, 4));
-          spawn({ pos: c.clone(), vel: d, g: -1.8, size: R(0.35, 0.55), life: R(1.4, 2.0), add: true, pw: 0.8,
-            color: (t, col) => col.setHSL(i % 3 === 0 ? hh : hue, 1, 0.7 - 0.2 * t) });
+      const f = fwd(), r = rgt(f), up = V(0, 1, 0);
+      const PAL = [0xff4a6a, 0xffd24a, 0x5ae0ff, 0x9a7bff, 0x6bff9a, 0xff8a3a, 0xffffff];
+      const burst = (c, col, col2, kind) => {
+        const n = kind === 0 ? 140 : 90;
+        for (let i = 0; i < n; i++) {
+          let d;
+          if (kind === 0) d = V(R(-1, 1), R(-1, 1), R(-1, 1)).normalize().multiplyScalar(R(3, 6));
+          else { const a = i / n * Math.PI * 2; d = r.clone().multiplyScalar(Math.cos(a) * 5.2).addScaledVector(up, Math.sin(a) * 5.2).addScaledVector(f, R(-0.5, 0.5)); }
+          spawn({ tex: 'spark', pos: c.clone(), vel: d, g: -1.3, drag: 0.7, size: R(0.35, 0.6), life: R(1.7, 2.4), add: true, pw: 0.7, color: i % 4 === 0 ? col2 : col, trail: i % 2 ? 0.08 : 0 });
         }
-        spawn({ pos: c.clone(), size: 5, life: 0.35, add: true, color: 0xffffff, op: 0.7 });
-        flash('#ffffff', 0.12, 300); buzz(50);
-      }, delay));
-      SND.hanabi();
+        for (let i = 0; i < 45; i++) spawn({ tex: 'spark', pos: c.clone(), vel: V(R(-1, 1), R(-0.3, 1), R(-1, 1)).normalize().multiplyScalar(R(0.5, 2.2)), g: -1.1, drag: 0.4, size: R(0.15, 0.3), life: R(2.4, 3.4), add: true, color: 0xffd27a, pw: 0.6 });   // 金色の、ふってくる粒
+        spawn({ pos: c.clone(), size: 8, life: 0.3, add: true, color: 0xffffff, op: 0.8 });
+        spawn({ tex: 'spark', pos: c.clone(), size: 12, life: 0.45, add: true, color: col, op: 1 });
+        spawn({ tex: 'ring', pos: c.clone(), size: 1, grow: 12, life: 0.7, add: true, color: col, op: 0.5 });
+        flash('#ffffff', 0.18, 350); kick(0.35); buzz(50);
+      };
+      [[0, 0], [550, 1], [1150, 0], [1800, 1]].forEach(([delay, kind]) => {
+        SND.shot(delay / 1000);
+        setTimeout(() => {
+          const base = at(f, R(9, 14), R(-6, 6), GROUND), top = base.clone().setY(R(3, 7)), col = PAL[Math.floor(R(0, PAL.length))], col2 = PAL[Math.floor(R(0, PAL.length))];
+          emit(0, 850, (dt, u) => {   // ひゅーっと、のぼる
+            const p = base.clone().lerp(top, 1 - Math.pow(1 - u, 2));
+            spawn({ pos: p.clone(), vel: V(R(-0.3, 0.3), R(-1.5, 0), R(-0.3, 0.3)), size: 0.28, life: 0.5, add: true, color: 0xffc870, op: 0.9 });
+            spawn({ tex: 'spark', pos: p, size: 0.35, life: 0.15, add: true, color: 0xffffff });
+          });
+          setTimeout(() => burst(top, col, col2, kind), 850);
+        }, delay);
+      });
     },
     heart() {
-      const f = fwd();
-      emit(0, 1800, (dt) => {
+      const f = fwd(), r = rgt(f), up = V(0, 1, 0), C = at(f, 7, 0, 0.9);
+      for (let i = 0; i < 220; i++) setTimeout(() => {   // 光の粒で、大きなハートを描く
+        const a = i / 220 * Math.PI * 2, x = 16 * Math.pow(Math.sin(a), 3), y = 13 * Math.cos(a) - 5 * Math.cos(2 * a) - 2 * Math.cos(3 * a) - Math.cos(4 * a);
+        spawn({ pos: C.clone().addScaledVector(r, x * 0.105).addScaledVector(up, y * 0.105), vel: V(0, 0.12, 0), size: 0.6, life: 3.2, add: true, color: 0xff6fae, op: 0.95, pw: 0.5, fadeIn: 0.05 });
+      }, i * 5);
+      for (let i = 0; i < 100; i++) setTimeout(() => {
+        const a = R(0, 6.283), rr = Math.sqrt(R(0, 1)) * 0.85, x = 16 * Math.pow(Math.sin(a), 3) * rr, y = (13 * Math.cos(a) - 5 * Math.cos(2 * a) - 2 * Math.cos(3 * a) - Math.cos(4 * a)) * rr;
+        spawn({ pos: C.clone().addScaledVector(r, x * 0.105).addScaledVector(up, y * 0.105), size: R(0.25, 0.5), life: 2.4, add: true, color: 0xff9ad0, op: 0.45, pw: 0.6, fadeIn: 0.1 });
+      }, 700 + i * 6);
+      setTimeout(() => { spawn({ tex: 'heart', pos: C.clone(), size: 3, grow: 2.2, life: 1.3, op: 0.95, pw: 0.7 }); spawn({ pos: C.clone(), size: 9, life: 0.8, add: true, color: 0xff7ab8, op: 0.6 }); flash('#ff9ad0', 0.3, 700); kick(0.2); buzz([40, 80, 40]); }, 1250);
+      emit(0, 2600, (dt) => {
         const n = Math.max(1, Math.round(dt * 14));
-        for (let i = 0; i < n; i++) spawn({ tex: '💖', pos: at(f, R(1.5, 4), R(-2.5, 2.5), R(-1.2, 0)), vel: new T.Vector3(R(-0.3, 0.3), R(0.6, 1.3), R(-0.3, 0.3)), size: R(0.3, 0.65), grow: 1.3, life: R(2.5, 3.5), pw: 0.4 });
-        if (Math.random() < dt * 20) spawn({ pos: at(f, R(1.5, 4), R(-2.5, 2.5), R(-1, 1)), size: 0.3, life: 0.6, add: true, color: 0xff9ad0, op: 0.8 });
+        for (let i = 0; i < n; i++) spawn({ tex: 'heart', pos: at(f, R(1.5, 4.5), R(-3, 3), R(-1.2, 0)), vel: V(R(-0.3, 0.3), R(0.7, 1.4), R(-0.3, 0.3)), size: R(0.3, 0.65), grow: 1.3, life: R(2.5, 3.5), pw: 0.4 });
+        if (Math.random() < dt * 25) spawn({ tex: 'spark', pos: at(f, R(1.5, 5), R(-3, 3), R(-1, 2.5)), size: R(0.2, 0.5), life: 0.7, add: true, color: 0xffc0e0, op: 0.9 });
       });
-      flash('#ff9ad0', 0.2, 600); SND.heart(); buzz(30);
+      veil('radial-gradient(ellipse at center, rgba(255,140,200,0) 40%, rgba(255,110,180,.4) 100%)', 0.7, 500, 2000, 1200);
+      SND.heart();
     },
     star() {
-      const f = fwd();
-      for (let k = 0; k < 6; k++) setTimeout(() => {
-        const start = at(f, R(6, 10), R(-2, 7), R(3, 6)), v = new T.Vector3(0, 0, 0).addScaledVector(rgt(f), -R(5, 8)).setY(-R(2, 3.5)).addScaledVector(f, R(-1, 1));
-        spawn({ tex: '⭐', pos: start, vel: v, size: 0.55, life: 1.3, pw: 0.5 });
-        emit(0, 1250, (dt) => {   // しっぽ
+      const f = fwd(), r = rgt(f);
+      for (let k = 0; k < 8; k++) setTimeout(() => {
+        const start = at(f, R(6, 11), R(-2, 8), R(3, 7)), v = V(0, 0, 0).addScaledVector(r, -R(6, 9)).setY(-R(2, 3.8)).addScaledVector(f, R(-1, 1)), tr0 = performance.now();
+        spawn({ tex: 'star', pos: start, vel: v, size: 0.8, life: 1.4, pw: 0.5, spin: 3 });
+        spawn({ tex: 'spark', pos: start.clone(), vel: v.clone(), size: 1.6, life: 1.4, add: true, color: 0xfff1a8, pw: 0.5 });
+        emit(0, 1300, () => {   // しっぽ
           const p = start.clone().addScaledVector(v, (performance.now() - tr0) / 1000);
-          for (let i = 0; i < 2; i++) spawn({ pos: p.clone().add(new T.Vector3(R(-0.1, 0.1), R(-0.1, 0.1), R(-0.1, 0.1))), size: R(0.25, 0.5), life: 0.6, add: true, color: 0xfff1a8, op: 0.8, grow: 0.3 });
+          for (let i = 0; i < 3; i++) spawn({ pos: p.clone().add(V(R(-0.1, 0.1), R(-0.1, 0.1), R(-0.1, 0.1))), size: R(0.25, 0.55), life: 0.7, add: true, color: 0xfff1a8, op: 0.8, grow: 0.3 });
         });
-        const tr0 = performance.now();
-      }, k * 220);
-      SND.star(); buzz(30);
+      }, k * 200);
+      emit(0, 2400, (dt) => { if (Math.random() < dt * 18) spawn({ tex: 'spark', pos: at(f, R(5, 14), R(-8, 8), R(1, 8)), size: R(0.4, 1), life: 1.4, add: true, color: 0xfff3b8, op: 0.9, fadeIn: 0.3 }); });
+      flash('#fff3b8', 0.15, 500); SND.star(); buzz(30);
+    },
+    kamehameha() {
+      const CH = 1700, LMAX = 38, TB = 2.7;
+      const f = fwd(), P = f.clone().multiplyScalar(0.9).setY(-0.45);
+      veil('radial-gradient(ellipse at center, rgba(60,140,255,0) 30%, rgba(60,140,255,.6) 100%)', 1, 900, 800, 900);
+      const mk = (hex) => new T.Sprite(new T.SpriteMaterial({ map: tex.glow, color: hex, transparent: true, depthTest: false, depthWrite: false, blending: T.AdditiveBlending }));
+      const A = mk(0x66ccff), B = mk(0xffffff); A.position.copy(P); B.position.copy(P); A.renderOrder = B.renderOrder = 4;
+      addFx([A, B], CH / 1000, (u, t) => { A.scale.setScalar(0.15 + 1.1 * u * u + 0.06 * Math.sin(t * 40)); B.scale.setScalar(0.08 + 0.45 * u); });
+      emit(0, CH, (dt, u) => {   // ため: 気が集まる
+        for (let i = 0; i < Math.round(dt * 110); i++) {
+          const dir = V(R(-1, 1), R(-1, 1), R(-1, 1)).normalize(), pos = P.clone().addScaledVector(dir, R(1.6, 4)), life = 0.6;
+          spawn({ tex: 'spark', pos, vel: P.clone().sub(pos).divideScalar(life), size: R(0.12, 0.3), life, add: true, color: Math.random() < 0.5 ? 0x9fe0ff : 0xffffff, pw: 0 });
+        }
+        if (Math.random() < dt * 70) { const a = R(0, 6.283), rr = R(1, 2.4); spawn({ tex: 'flame', aspect: 0.5, pos: V(Math.cos(a) * rr, GROUND + 0.8, Math.sin(a) * rr), vel: V(0, R(3, 5.5), 0), size: R(1.2, 2), life: 0.7, add: true, color: 0x6ad0ff, op: 0.6, grow: 0.6 }); }
+        if (Math.random() < dt * 10) { const b = P.clone().add(V(R(-1, 1), R(-1, 1), R(-1, 1)).normalize().multiplyScalar(R(0.8, 1.7))); boltFx(boltPolys(P.clone(), b, 3, 0.25, false), 0.14, 0.18, 0x66ccff); }
+        kick(0.04 + 0.28 * u * u);
+      });
+      [0, 450, 850, 1200, 1500].forEach((d) => setTimeout(() => spawn({ tex: 'ring', pos: P.clone(), size: 0.6, grow: 6, life: 0.7, add: true, color: 0x88ddff, op: 0.8 }), d));
+      setTimeout(() => {   // 発射
+        const D = camera.getWorldDirection(new T.Vector3()).normalize(), O = D.clone().multiplyScalar(0.9).add(V(0, -0.45, 0));
+        const qd = new T.Quaternion().setFromUnitVectors(V(0, 1, 0), D), s1 = new T.Vector3().crossVectors(D, V(0, 1, 0)).normalize(), s2 = new T.Vector3().crossVectors(D, s1).normalize();
+        const LAY = [[0.07, 0xffffff, 1], [0.15, 0xe6f8ff, 0.6], [0.26, 0xa8e4ff, 0.4], [0.4, 0x5ab8ff, 0.28], [0.6, 0x2f80ff, 0.2]];
+        const meshes = LAY.map(([rad, col, op]) => { const me = new T.Mesh(new T.CylinderGeometry(rad, rad * 0.3, 1, 20, 1, true), addMat(col, op)); me.renderOrder = 3; return me; });
+        const H1 = mk(0x9fe0ff), H2 = new T.Sprite(new T.SpriteMaterial({ map: tex.spark, color: 0xffffff, transparent: true, depthTest: false, depthWrite: false, blending: T.AdditiveBlending })), S = mk(0x66ccff);
+        H1.renderOrder = H2.renderOrder = S.renderOrder = 4;
+        addFx(meshes.concat([H1, H2, S]), TB, (u, t, dt) => {
+          const len = Math.min(LMAX, 75 * t), widen = Math.min(1, t / 0.18) * (t > TB - 0.7 ? Math.max(0, (TB - t) / 0.7) : 1), wob = 1 + 0.07 * Math.sin(t * 55) + 0.04 * Math.sin(t * 23);
+          meshes.forEach((me) => { me.scale.set(Math.max(0.001, widen * wob), Math.max(0.01, len), Math.max(0.001, widen * wob)); me.position.copy(O).addScaledVector(D, len / 2); me.quaternion.copy(qd); });
+          H1.position.copy(O).addScaledVector(D, len); H2.position.copy(H1.position); H1.scale.setScalar((3.5 + Math.sin(t * 30)) * widen + 0.01); H2.scale.setScalar(6 * widen + 0.01);
+          S.position.copy(O); S.scale.setScalar((1.4 + 0.2 * Math.sin(t * 35)) * widen + 0.01);
+          for (let i = 0; i < Math.round(dt * 420 * widen); i++) {   // ビームのまわりの火花
+            const al = R(0, len);
+            spawn({ tex: 'spark', pos: O.clone().addScaledVector(D, al).addScaledVector(s1, R(-1, 1) * 0.7).addScaledVector(s2, R(-1, 1) * 0.7), vel: D.clone().multiplyScalar(R(10, 24)).addScaledVector(s1, R(-1.5, 1.5)).addScaledVector(s2, R(-1.5, 1.5)), size: R(0.14, 0.34), life: 0.5, add: true, color: Math.random() < 0.5 ? 0xffffff : 0x8fd8ff, pw: 0.8 });
+          }
+          kick(0.55 * widen);
+        });
+        flash('#ffffff', 0.7, 600); buzz([60, 20, 60, 20, 80, 20, 200]);
+        veil('radial-gradient(ellipse at center, rgba(120,200,255,.2) 20%, rgba(60,140,255,.5) 100%)', 1, 150, 1800, 700);
+        setTimeout(() => {   // 当たって、ドカーン
+          const head = O.clone().addScaledVector(D, LMAX);
+          for (let i = 0; i < 80; i++) { const dir = V(R(-1, 1), R(-1, 1), R(-1, 1)).normalize(); spawn({ pos: head.clone(), vel: dir.multiplyScalar(R(3, 13)), size: R(2, 5.5), grow: 1.8, life: R(0.9, 1.8), add: true, op: 0.8, pw: 0.8, drag: 1, color: (t, c) => c.setHSL(0.58 - 0.5 * t, 1, 0.85 - 0.45 * t) }); }
+          spawn({ pos: head.clone(), size: 30, life: 0.7, add: true, color: 0xffffff, op: 1 });
+          spawn({ tex: 'spark', pos: head.clone(), size: 36, life: 0.6, add: true, color: 0xcdeeff });
+          [0, 150].forEach((d) => setTimeout(() => spawn({ tex: 'ring', pos: head.clone(), size: 4, grow: 14, life: 0.9, add: true, color: 0x9fe0ff, op: 0.8 }), d));
+          flash('#ffffff', 0.9, 900); kick(1); buzz([200, 40, 120]);
+        }, 480);
+      }, CH);
+      SND.kame();
     },
   };
+
 
   const lastCast = {};
   function cast(name, source) {
     const now = performance.now();
-    if (!MAGIC[name] || now - (lastCast[name] || 0) < 500) return;
+    if (!MAGIC[name] || now - (lastCast[name] || -1e9) < (SPELLS[name].cd || 500)) return;
     lastCast[name] = now;
     if (ac && ac.state === 'suspended') ac.resume();
     try { MAGIC[name](); } catch (e) { $('diag').textContent = '魔法のエラー: ' + (e && e.message); }
@@ -369,7 +641,7 @@
     requestAnimationFrame(loop);
     try {
       const dt = Math.min(0.05, (t - lastT) / 1000 || 0.016); lastT = t;
-      meterTick(); look(); updateEmitters(dt); updateParts(dt); renderer.render(scene, camera);
+      meterTick(); look(); updateEmitters(dt); updateFx(dt); updateParts(dt); applyShake(dt); renderer.render(scene, camera);
       if (Math.floor(t / 500) !== loop.k) { loop.k = Math.floor(t / 500); $('diag').textContent = '粒 ' + parts.length + (ori.n ? ' 向き○' : ' 向き×') + (castLog.length ? '\n' + castLog.join(' / ') : '') + '\n版 ' + VER; }
     } catch (e) { $('diag').textContent = 'エラー: ' + (e && e.message); }
   }

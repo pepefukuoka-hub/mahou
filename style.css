@@ -13,10 +13,11 @@ h1 { font-size: 36px; margin: 6px 0 0; letter-spacing: .2em; background: linear-
 button { font: inherit; color: var(--fg); background: #241543; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; min-height: 52px; width: 100%; }
 button.primary { background: linear-gradient(90deg, #b36bff, #6b9bff); color: #fff; border: 0; font-weight: 700; font-size: 20px; }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-#stage { position: fixed; inset: 0; background: #000; overflow: hidden; touch-action: none; }
+#stage { will-change: transform; position: fixed; inset: 0; background: #000; overflow: hidden; touch-action: none; }
 #cam, #gl { position: absolute; inset: 0; width: 100%; height: 100%; }
 #cam { object-fit: cover; }
 #gl { pointer-events: none; }
+#veil { position: absolute; inset: 0; opacity: 0; pointer-events: none; }
 #flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
 #hud { position: absolute; left: 0; right: 0; top: 0; padding: max(10px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) 0 max(12px, env(safe-area-inset-left, 0px)); pointer-events: none; }
 #heard { display: inline-block; max-width: 100%; background: rgba(10,4,24,.6); border-radius: 18px; padding: 6px 14px; font-size: 16px; overflow-wrap: anywhere; }
